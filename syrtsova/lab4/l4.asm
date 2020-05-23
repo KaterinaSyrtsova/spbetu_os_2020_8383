@@ -1,267 +1,273 @@
 CODE SEGMENT
-	ASSUME CS:CODE, DS:DATA, ES:DATA, SS:MY_STACK
 
-setCurs PROC 
-	push ax
-	push bx		
-	push cx	
-	mov ah,02h
-	mov bh,00h
-	int 10h 
-	pop cx
-	pop bx
-	pop ax
-	ret
-setCurs ENDP
-
-getCurs PROC 
-	push ax
-	push bx
-	push cx
-	mov ah,03h 
-	mov bh,00h 
-	int 10h 
-	pop cx
-	pop bx
-	pop ax
-	ret
-getCurs ENDP
+ASSUME CS:CODE, DS:DATA, ES:NOTHING, SS:AStack
 
 printSTR PROC 
-	push es 
-	push bp	
-	mov ax,SEG COUNT
-	mov es,ax
-	mov ax,offset COUNT
-	mov bp,ax  
-	mov ah,13h 
-	mov al,00h 
-	mov cx,25
-	mov bh,0 
-	mov bl, 13
+	push AX
+	push BX
+	push CX
+	mov AH, 09h
+	mov BH, 0
+	mov CX, 1
 	int 10h
-	pop bp
-	pop es
+	pop CX
+	pop BX
+	pop AX
 	ret
 printSTR ENDP
 
-ROUT PROC FAR 
+getCurs  PROC
+	push AX
+	push BX
+	mov AH, 03h
+	mov BH, 0
+	int 10h
+	pop BX
+	pop AX
+	ret
+getCurs  ENDP
+
+setCurs  PROC
+	push AX
+	push BX
+	mov AH, 02h
+	mov BH, 0
+	int 10h	
+	pop BX
+	pop AX
+	ret
+setCurs  ENDP
+
+ROUT PROC FAR
 	jmp ROUT_START
-
-	;DATA
-	identifier db '0000' 
-	KEEP_IP dw 0 
-	KEEP_CS dw 0 
-	KEEP_PSP dw 0 
-	flag db 0 
+	flag DW 1274h
+	KEEP_IP DW 0 
+	KEEP_CS DW 0 
+	KEEP_PSP dw 0
 	KEEP_SS dw 0
-	KEEP_AX dw 0	
 	KEEP_SP dw 0
-	COUNT db 'Count of interrupt: 0000 $' 
-	inter_stack dw 64 dup (?)
-	end_stack dw 0
+	KEEP_AX dw 0
+	count db 48
+	inter_stack dw 200 dup(?)
 
-ROUT_COUNT:	
-	push si 
-	push cx 
-	push ds
-	mov ax,SEG COUNT
-	mov ds,ax
-	mov si,offset COUNT 
-	add si, 23
-	mov ah,[si] 
-	add ah,1 
-	mov [si],ah 
-	cmp ah,58
-	jne END_COUNT
-	mov ah,48
-	mov [si],ah 
-	mov bh,[si-1] 
-	add bh,1
-	mov [si-1],bh
-	cmp bh,58                  
-	jne END_COUNT 
-	mov bh,48
-	mov [si-1],bh 
-	mov ch,[si-2] 
-	add ch,1 
-	mov [si-2],ch 
-	cmp ch,58
-	jne END_COUNT
-	mov ch,48 
-	mov [si-2],ch 
-	mov dh,[si-3] 
-	add dh, 1 
-	mov [si-3],dh
-	cmp dh,58
-	jne END_COUNT
-	mov dh,48
-	mov [si-3],dh
-
-END_COUNT:
-    pop ds
-    pop cx
-	pop si
-	call printSTR
-	pop dx
-	call setCurs
-	jmp END_ROUT
+SET_INTERRUPT:
 
 ROUT_START:
-	mov KEEP_AX, ax 
 	mov KEEP_SS, ss 
-	mov KEEP_SP, sp
-	mov ax, cs
-	mov ss, ax
-	mov sp, offset end_stack
-	mov ax, KEEP_AX
-	push dx 
-	push ds
-	push es
-	cmp flag, 1
-	je ROUT_REC
-	call getCurs 
-	push dx 
-	mov dh,22  
-	mov dl,39
-	call setCurs
-	jmp ROUT_COUNT
+	mov KEEP_SP, sp 
+	mov KEEP_AX, ax 
+	mov ax, seg inter_stack 
+	mov ss, ax 
+	mov sp, offset SET_INTERRUPT	
+	push AX
+	push BX
+	push CX
+	push DX
+	push ES
+	inc count
+	cmp count, 57 
+	jne END_COUNT
+	mov count, 48
 
-ROUT_REC:
-	CLI 
-	mov dx,KEEP_IP
-	mov ax,KEEP_CS
-	mov ds,ax 
-	mov ah,25h 
-	mov al,1Ch 
-	int 21h 
-	mov es, KEEP_PSP 
-	mov es, es:[2Ch]  
-	mov ah, 49h     
-	int 21h 
-	mov es, KEEP_PSP 
-	mov ah, 49h  
-	int 21h	
-	STI 
-	
-END_ROUT:
-	pop es 
-	pop ds
-	pop dx
-	mov ss, KEEP_SS
+END_COUNT:
+	call getCurs
+	mov CX, DX
+	mov DH, 23
+	mov Dl, 33
+	call setCurs
+	push AX
+	mov AL, count
+	call printSTR
+	pop AX
+	mov DX, CX
+	call setCurs
+	mov AL, 20h
+	out 20h, AL
+	pop ES
+	pop DX
+	pop CX
+	pop BX
+	pop AX
 	mov sp, KEEP_SP
+	mov ax, KEEP_SS
+	mov ss, ax
 	mov ax, KEEP_AX
-	iret
+	mov al, 20h
+	out 20h, al	
+	iret 
+	
 ROUT ENDP
 
-SET_INTERRUPT PROC 
-	push dx
-	push ds
-	mov ah,35h 
-	mov al,1Ch 
-	int 21h
-	mov KEEP_IP,bx 
-	mov KEEP_CS,es 
-	mov dx,offset ROUT 
-	mov ax,seg ROUT 
-	mov ds,ax 
-	mov ah,25h 
-	mov al,1Ch 
-	int 21h 
-	pop ds
-	mov dx,offset message_1 
-	call PRINT
-	pop dx
-	ret
-SET_INTERRUPT ENDP 
+LAST_BYTE:
 
 BASE_FUNC PROC
-	mov ah,35h 
-	mov al,1Ch 
-	int 21h 
+	push BX
+	push DX
+	push SI
+	push ES
+	mov AH, 35h
+	mov AL, 1Ch
+	int 21h
+	lea SI, flag
+	sub SI, offset ROUT 
+	mov AX, 1
+	mov BX, ES:[BX+SI]
+	cmp BX, flag
+	je END_ROUT
+	mov AX, 0
 
-	mov si, offset identifier 
-	sub si, offset ROUT 
-	
-	mov ax,'00' 
-	cmp ax,es:[bx+si] 
-	jne NOT_LOADED 
-	cmp ax,es:[bx+si+2] 
-	jne NOT_LOADED 
-	jmp LOADED 
-	
-NOT_LOADED: 
-	call SET_INTERRUPT
-	mov dx,offset LAST_BYTE 
-	mov cl,4 
-	shr dx,cl
-	inc dx	
-	add dx,CODE 
-	sub dx,KEEP_PSP 
-	xor al,al
-	mov ah,31h 
-	int 21h 
-
-LOADED: 
-	push es
-	push ax
-	mov ax,KEEP_PSP 
-	mov es,ax
-	mov al, es:[81h+1]
-	cmp al,'/' 
-	jne NOT_UNLOAD 
-	mov al, es:[81h+2]
-	cmp al,'u'
-	jne NOT_UNLOAD 
-	mov al, es:[81h+3]
-	cmp al,'n' 
-	je UNLOAD 
-
-NOT_UNLOAD: 
-	pop ax
-	pop es
-	mov dx,offset message_2
-	call PRINT
+END_ROUT:
+	pop ES
+	pop SI
+	pop DX
+	pop BX
 	ret
 
-UNLOAD: 
-	pop ax
-	pop es
-	mov byte ptr es:[bx+si+10],1 
-	mov dx,offset message_3 
-	call PRINT
-	ret
 BASE_FUNC ENDP
 
-PRINT PROC NEAR
+CHECK_UN PROC
+	cmp byte ptr ES:[82h], '/'
+	jne CHECK_TAIL
+	cmp byte ptr ES:[83h], 'u'
+	jne CHECK_TAIL
+	cmp byte ptr ES:[84h], 'n'
+	jne CHECK_TAIL
+	mov BX, 1
+
+CHECK_TAIL:
+	ret
+
+CHECK_UN ENDP
+
+UNLOAD PROC 
 	push ax
-	mov ah, 09h
+	push bx
+	push dx
+	push es
+	push si
+	cli
+	mov ah, 35h
+	mov al, 1Ch
 	int 21h
+	mov si, offset KEEP_IP
+	sub si, offset ROUT 
+	push ds
+	mov dx, es:[bx+si]
+	mov ax, es:[bx+si+2]
+	mov ds, ax
+	mov ah, 25h
+	mov al, 1Ch
+	int 21h
+	pop ds
+	mov ax, es:[bx+si+4]
+	mov es, ax
+	push es
+	mov ax, es:[2Ch]
+	mov es, ax
+	mov ah, 49h
+	int 21h
+	pop es
+	mov ah, 49h
+	int 21h
+	sti
+	pop si
+	pop es
+	pop dx
+	pop bx
 	pop ax
+	ret
+UNLOAD ENDP
+
+LOAD PROC	
+	push ax
+	push bx
+	push es
+	push dx
+	mov AH, 35h
+	mov AL, 1Ch 
+	int 21h
+	mov KEEP_IP , BX
+	mov KEEP_CS , ES
+	push DS
+	mov DX, offset ROUT
+	mov AX, seg ROUT 	    
+	mov DS, AX
+	mov AH, 25h		 
+	mov AL, 1Ch         	
+    	int 21h
+	pop ds
+	mov DX,offset LAST_BYTE
+	mov CL,4
+	shr DX,CL
+	inc DX
+	add dx,10h
+	mov AH,31h
+	int 21h
+	pop dx
+	pop es
+	pop bx
+	pop ax
+	ret
+LOAD ENDP
+
+PRINT PROC
+	push AX
+	mov AH, 09h
+	int 21h
+	pop AX
 	ret
 PRINT ENDP
 
-MAIN PROC Far
-	mov ax,DATA
-	mov ds,ax
-	mov KEEP_PSP,es 
+MAIN PROC
+	PUSH DS
+	SUB AX, AX
+	SUB BX, BX
+	PUSH AX
+	MOV AX, DATA
+	MOV DS, AX
+	mov KEEP_PSP, ES
 	call BASE_FUNC
-	xor al,al
-	mov ah,4Ch 
-	int 21H
-LAST_BYTE:
-	MAIN ENDP
-	CODE ENDS	
+	call CHECK_UN
+	cmp BX, 1
+	je unload_point
+	cmp AX, 1
+	je end_point3
+load_point:
+	lea dx, message_1
+	call PRINT
+	call LOAD
+	jmp end_point
+unload_point:
+	cmp AX, 0
+	je end_point2
+	lea dx, message_2
+	call PRINT
+	call UNLOAD
+	jmp end_point
+end_point3:
+	lea dx, message_3
+	call PRINT
+	jmp end_point
+end_point2:
+	lea dx, message_4
+	call PRINT
+end_point:
+	xor AL, AL
+	mov AH, 4Ch
+	int 21h
+MAIN ENDP
 
-MY_STACK SEGMENT STACK
-	DW 64 DUP (?)
-MY_STACK ENDS
+CODE ENDS
 
 DATA SEGMENT
-	message_1 db 'Resident was loaded', 13, 10, '$'
-	message_2 db 'Resident has already been loaded', 13, 10, '$'
-	message_3 db 'Resident was unloaded', 13, 10, '$'
+	message_1 db "Resident was loaded",0dh,0ah,'$'
+	message_2 db "Resident was unloaded",0dh,0ah,'$'
+	message_3 db "Resident has already been loaded",0dh,0ah,'$'
+	message_4 db "Resident has already been unloaded",0dh,0ah,'$'
 DATA ENDS
 
-	END MAIN
+AStack SEGMENT STACK
+	DW 200 DUP(?)
+AStack ENDS
 
+END MAIN
